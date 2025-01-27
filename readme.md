@@ -8,7 +8,7 @@
 4.  [Mutex und Semaphore](#mutex-und-sempaphore)
 5.  [Concurrency und Parallelism](#concurrency-and-parallelism)
 6.  [Future, Promise, Continuation](#future-promise-continuation)
-7.  [Asynchore Programmierung](#asynchrone-programmierung)
+7.  [Asynchore Programmierung, Future, Promise, Continuation](#asynchrone-programmierung-future-promise-continuation)
 
 ## Beschreibung von Speedup und Effizienz
 
@@ -126,8 +126,6 @@ Semaphore = Komplexerer Synchronisationsmechanismus, der auf einem Zähler basie
 
 ## Concurrency and Parallelism
 
-TODO
-
 ### Concurrency (Nebenläufigkeit)
 
 Beschäftigt sich damit mehrere Dinge gleichzeitig zu behandel (Struktur)
@@ -149,9 +147,7 @@ Beschäftigt sichd damit mehre Dinge gleichzeitig auszuführen(Ausführung)
 - Fokusiert sich auf die gleichzeitige Ausführung
 - Physische parallel Ausführung von Prozessen
 
-## Future, Promise, Continuation
-
-## Asynchrone Programmierung
+## Asynchrone Programmierung Future Promise Continuation
 
 Das asynchrone Programmiermodell ermöglicht es, dass lang andauernde oder blockierende Aufgaben (wie z. B. Netzwerkanfragen) parallel ausgeführt werden, ohne die Ausführung des Hauptprogramms zu unterbrechen. Dies geschieht durch die Trennung von Initiierung und Abschluss einer Aufgabe.
 
@@ -171,7 +167,27 @@ public async Task<string> GetDataAsync() {
 }
 ```
 
-Die wichtigsten Konzepte sind:
+### Continuation
+
+Eine Asynchore aufgare welche von einer vorangehenden Aufgabe aufgerufen wird, wenn diese fertig ist.
+
+```csharp
+ //waitforfivesecondsthenprintthe number 42
+Task.Delay(5000).GetAwaiter().OnCompleted(()=> Console.WriteLin(42));
+
+//or
+Task.Delay(5000).ContinueWith(ant =>Console.WriteLine (42));
+```
+
+```csharp
+primeNumberTask.ContinueWith(antecedent =>
+{
+    int result=antecedent.Result;
+    Console.WriteLine(result);
+});
+```
+
+**Die wichtigsten Konzepte sind:**
 
 - `async` markiert eine Methode als asynchron
 - `Task` (oder `Task<T>` für Methoden, die einen Wert zurückgeben) repräsentiert die asynchrone Operation und fungiert als Platzhalterobjekt (Future)
@@ -195,5 +211,53 @@ Hier ein Beispiel:
 public async Task<int> DoSomethingAsync() {
     var result = await CallDependencyAsync();
     return result + 1;
+}
+```
+
+## Thread Save Unbouned Queue
+
+```c#
+class ProducerConsumerQueue :IDisposable {
+  SemaphoreSlimsem = new SemaphoreSlim(0, int.MaxValue); //signal worker thread
+  Thread worker;
+  object locker = newobject(); //explicit sync object
+  Queue<object> jobs = new Queue<object>();
+  bool terminate = false; //signal termination
+
+  publicProducerConsumerQueue() {
+    worker= new Thread(Work);
+    worker.IsBackground = true;
+    worker.Start();
+  }
+
+  public void EnqueueJob(object job){
+    lock (locker){ // Thread-safe job addition
+      jobs.Enqueue(job); //add new job to the job queue
+    }
+    sem.Release();  //signal that new work is available -> Wake up Worker if blocked
+  }
+
+  public void Dispose(){
+    terminate = true;
+    signal.Release();
+    worker.Join();  //terminate work
+  }
+  void Work() {
+    while (!terminate) {
+      object job = null;
+      lock(locker) {  // Thread-safe job retrieval
+        if(jobs.Count > 0){
+          job = jobs.Dequeue(); //get next job
+        }
+      }
+
+      if(job != null){ //execute job or wait
+        Console.WriteLine("Job"+job);
+      }
+      else {
+        sem.Wait();   // No jobs available, wait for signal from EnqueueJob -> Blocked
+        }
+      }
+   }
 }
 ```
