@@ -242,7 +242,7 @@ class ProducerConsumerQueue :IDisposable {
     signal.Release();
     worker.Join();  //terminate work
   }
-  void Work() {
+  public void Work() {
     while (!terminate) {
       object job = null;
       lock(locker) {  // Thread-safe job retrieval
@@ -260,4 +260,101 @@ class ProducerConsumerQueue :IDisposable {
       }
    }
 }
+```
+
+## Parallel.For
+
+```csharp
+// Sequential for
+for(int i=0;i< n;++i){
+  Process(i);
+}
+
+// Parallel For -> von 0 bis n
+Parallel.For(0, n, i => {
+  Process(i);
+});
+
+// Thread-local variables
+Parallel.For   (fromInclusive, toExclusive, localInit, body, localFinally)
+Parallel.For<T>(Int64,  Int64,  Func<T>,  Func<Int64, ParallelLoopState, T>,  Action<T>)
+
+int[] nums = Enumerable.Range(0,1_000_000).ToArray();
+longtotal = 0;
+
+// Use type parameter to make subtotal a long, not an int
+var result = Parallel.For<long>(
+      0,                    // fromInclusive
+      nums.Length,          // toExclusive
+      () =>0,               // localInit
+      (j, loop, subtotal) => // subtotal isthread-local
+        { // this is the loop body
+          subtotal += nums[j];
+          returnsubtotal;
+        },
+      subtotal => Interlocked.Add(ref total,subtotal)); // localFinally
+
+
+
+
+```
+
+## Parallel.ForEach
+
+```csharp
+// Sequential foreach
+foreach(varitem in sourceCollection){
+  Process(item);
+}
+
+// Parallel ForEach -> Ã¼ber IEnumberable
+Parallel.ForEach(sourceCollection, item => {
+  Process(item);
+});
+
+// Partition-local variables
+Parallel.ForEach   (sourceCollection, localInit, body, localFinally)
+Parallel.ForEach<T>(IEnumerable<T>,  Func<T>,  Func<Int64, ParallelLoopState, T>, Action<T>)
+
+int[] nums = Enumerable.Range(0,1_000_000).ToArray();
+longtotal = 0;
+
+// <type of source elements,  type of thread-local variable>
+var result = Parallel.ForEach<int, long>(
+      nums,     // sourceCollection
+      () => 0,  // localInit
+      (j, loop, subtotal)=> // subtotal is thread-local
+        { //  this is the loop body
+          subtotal += j;
+          return subtotal;
+        },
+      //  finalResult is a partition-local variable
+      (finalResult)=> Interlocked.Add(ref total,finalResult)); // localFinally
+```
+
+## Partitioner
+
+```csharp
+double[] values = ...;
+double sum = 0; // Declare the sum variable
+object locker = new object();
+var rangePartitioner = Partitioner.Create(0, values.Length);
+
+Parallel.ForEach(
+      rangePartitioner, // Range to aggregate
+      () => 0.0,        // Initial partial result
+      (range, state, initialValue) =>
+        { // Loop body for each range
+          double partialResult = initialValue;
+          for (int i = range.Item1; i < range.Item2; ++i) {
+              partialResult += Normalize(values[i]);
+          }
+          return partialResult;
+        },
+      (partialResult) => { // Compute final result
+          lock (locker) {
+              sum += partialResult; // Write to the shared sum variable
+          }
+      }
+);
 ```
